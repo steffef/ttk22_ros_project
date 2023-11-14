@@ -82,8 +82,5 @@ void Listener::callback(const sensor_msgs::PointCloud2ConstPtr& ptCloud) {
     slam.icp_alg(cloud);
     geometry_msgs::Pose slam_pose = slam.get_pose_msg();
 
-    std::cout << "pose:" << std::endl;
-    std::cout << slam_pose << std::endl;
-
     pose_pub.publish(slam_pose);
 }

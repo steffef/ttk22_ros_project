@@ -19,8 +19,8 @@ cs_add_library(
   src/slam.cpp
 )
 
-cs_add_executable(slam_node src/slam_ros_node.cpp)
-target_link_libraries(slam_node ${PROJECT_NAME} ${PCL_LIBRARIES})
+cs_add_executable(slam_ros_node src/slam_ros_node.cpp)
+target_link_libraries(slam_ros_node ${PROJECT_NAME} ${PCL_LIBRARIES})
 
 cs_install()
 cs_export(LIBRARIES)

@@ -17,12 +17,13 @@ wstool merge ./src/ttk22_ros_project/packages_ssh.rosinstall
 wstool update
 ```
 
-Finally we compile the code:
+Finally we compile the code and source the catkin ws setup:
 
 ```bash
 cd <ros_ws>
 catkin config -DCMAKE_BUILD_TYPE=Release
 catkin build
+source devel/setup.bash
 ```
 
 The slam node can then be run with

@@ -1,33 +1,30 @@
 #include "slam.h"
 
 SLAM::SLAM() : icp() {
-    icp.setMaximumIterations(500);
+    icp.setMaximumIterations(100);
     icp.setTransformationEpsilon(1e-9);
-    icp.setMaxCorrespondenceDistance(0.05);
+    icp.setMaxCorrespondenceDistance(0.5);
     icp.setEuclideanFitnessEpsilon(1.0);
-    icp.setRANSACOutlierRejectionThreshold(1.5);
+    icp.setRANSACOutlierRejectionThreshold(0.01);
 }
 
 void SLAM::icp_alg(const pcl::PointCloud<pcl::PointXYZ>& pc) {
     if (prev_keypoints.empty()) {
-        std::cout << "Initializing keypoints" << std::endl;
-        //extract_keypoints(pc, prev_keypoints);
-        prev_keypoints = pc;
+        extract_keypoints(pc, prev_keypoints);
+        //prev_keypoints = pc;
         return;
     }
 
     pcl::PointCloud<pcl::PointXYZ> transformed_cloud;
     pcl::PointCloud<pcl::PointXYZ> keypoints;
-    //extract_keypoints(pc, keypoints);
-    keypoints = pc;
+    extract_keypoints(pc, keypoints);
+    //keypoints = pc;
 
-    icp.setInputSource(prev_keypoints.makeShared());
+    icp.setInputCloud(prev_keypoints.makeShared());
     icp.setInputTarget(keypoints.makeShared());
     icp.align(transformed_cloud);
 
     if (icp.hasConverged()) {
-        std::cout << "ICP converged. The fitness score is " << icp.getFitnessScore() << std::endl;
-
         transformationMatrix = icp.getFinalTransformation();
         Eigen::Quaternionf quat(transformationMatrix.block<3, 3>(0, 0));
 
@@ -40,7 +37,8 @@ void SLAM::icp_alg(const pcl::PointCloud<pcl::PointXYZ>& pc) {
         // Check if pose orientation is valid
         if (pose.orientation.x == 0 && pose.orientation.y == 0 && pose.orientation.z == 0 &&
             pose.orientation.w == 0) {
-            std::cout << "Initializing pose" << std::endl;
+
+            // Set initial pose
             tf::poseTFToMsg(tf_transform, pose);
         } else {
             tf::Transform tf_pose;
@@ -51,20 +49,28 @@ void SLAM::icp_alg(const pcl::PointCloud<pcl::PointXYZ>& pc) {
 
         prev_keypoints = keypoints; // Update the previous point cloud
     } else {
-        std::cout << "ICP did not converge. Fitness score: " << icp.getFitnessScore() << std::endl;
+        ROS_WARN("ICP did not converge.");
     }
 }
 
  void SLAM::extract_keypoints(const pcl::PointCloud<pcl::PointXYZ>& pc,
                                 pcl::PointCloud<pcl::PointXYZ>& keypoints) {
     pcl::ISSKeypoint3D<pcl::PointXYZ, pcl::PointXYZ> iss_keypoint;
-    iss_keypoint.setInputCloud(pc.makeShared());
-    iss_keypoint.setNonMaxRadius(0.2);
-    iss_keypoint.setSalientRadius(0.5);
+
+    if(pc.empty()) {
+        ROS_WARN("Point cloud is empty.");
+        return;
+    }
+
+    double resolution = 0.05; // Treated as tuning parameter
+    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
+    iss_keypoint.setSearchMethod(tree);
+    iss_keypoint.setSalientRadius(6 * resolution);
+    iss_keypoint.setNonMaxRadius(4 * resolution);
     iss_keypoint.setThreshold21(0.975);
     iss_keypoint.setThreshold32(0.975);
     iss_keypoint.setMinNeighbors(5);
-
+    iss_keypoint.setInputCloud(pc.makeShared());
     iss_keypoint.compute(keypoints);
 }
 
@@ -72,12 +78,26 @@ geometry_msgs::Pose SLAM::get_pose_msg() {
     return pose;
 }
 
-Listener::Listener() : nh(), pose_pub(nh.advertise<geometry_msgs::Pose>("slam_pose_topic", 1)) {
+PcPcrocessor::PcPcrocessor() : nh(), pose_pub(nh.advertise<geometry_msgs::Pose>("slam_pose_topic", 1)) {
 }
 
-void Listener::callback(const sensor_msgs::PointCloud2ConstPtr& ptCloud) {
+void PcPcrocessor::callback(const sensor_msgs::PointCloud2ConstPtr& ptCloud) {
+    
+    // Transform from velodyne to navigation frame
+    sensor_msgs::PointCloud2 transformed_cloud;
+    tf2_ros::TransformListener tfListener(tfBuffer);
+    geometry_msgs::TransformStamped tf_stamped;
+    try {
+        tf_stamped = tfBuffer.lookupTransform("navigation", "rmf_obelix/rmf_obelix/velodyne", ros::Time(0));
+        tf2::doTransform(*ptCloud, transformed_cloud, tf_stamped);
+    } catch (tf2::TransformException &ex) {
+        ROS_WARN("%s", ex.what());
+        ros::Duration(1.0).sleep(); // Ensure that transform gets published
+    }
+
+    // Convert from PointCloud2 to PointCloud to use with PCL
     pcl::PointCloud<pcl::PointXYZ> cloud;
-    pcl::fromROSMsg(*ptCloud, cloud);
+    pcl::fromROSMsg(transformed_cloud, cloud);
 
     slam.icp_alg(cloud);
     geometry_msgs::Pose slam_pose = slam.get_pose_msg();

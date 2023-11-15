@@ -8,8 +8,8 @@ int main(int argc, char** argv) {
   ros::NodeHandle nh;
   ros::NodeHandle nh_private("~");
 
-  Listener listener;
-  ros::Subscriber sub = nh.subscribe<sensor_msgs::PointCloud2>("/rmf_obelix/velodyne_points",10, &Listener::callback, &listener);
+  PcPcrocessor pcPcrocessor;
+  ros::Subscriber sub = nh.subscribe<sensor_msgs::PointCloud2>("/rmf_obelix/velodyne_points",10, &PcPcrocessor::callback, &pcPcrocessor);
 
   ros::spin();
 

@@ -1,6 +1,13 @@
 <launch>
-  <!-- Planner and Control Interface -->
   <node pkg="slam" type="slam_ros_node" name="slam_ros_node" output="screen">
+    <!--<remap from="command/trajectory" to="$(arg robot_name)/command/trajectory" />
+    <remap from="planner_server" to="gbplanner" />
+    <remap from="planner_homing_server" to="gbplanner/homing" />
+    <remap from="odometry" to="$(arg odometry_topic)"/>
+    <rosparam command="load" file="$(arg pci_file)" /> -->
+  </node>
+
+  <node pkg="slam_eval" type="slam_eval.py" name="slam_eval" output="screen">
     <!--<remap from="command/trajectory" to="$(arg robot_name)/command/trajectory" />
     <remap from="planner_server" to="gbplanner" />
     <remap from="planner_homing_server" to="gbplanner/homing" />

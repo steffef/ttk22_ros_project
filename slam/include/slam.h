@@ -8,6 +8,10 @@
 #include <pcl/common/transforms.h>
 #include <pcl/keypoints/iss_3d.h>
 #include <tf/transform_datatypes.h>
+#include <tf2_ros/buffer.h>
+#include <tf2/transform_datatypes.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_sensor_msgs/tf2_sensor_msgs.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <geometry_msgs/Pose.h>
 #include <iostream>
@@ -40,9 +44,9 @@ private:
     geometry_msgs::Pose pose;
 };
 
-class Listener {
+class PcPcrocessor {
 public:
-    Listener();
+    PcPcrocessor();
 
     void callback(const sensor_msgs::PointCloud2ConstPtr& ptCloud);
 
@@ -50,6 +54,7 @@ private:
     SLAM slam;
     ros::NodeHandle nh;
     ros::Publisher pose_pub;
+    tf2_ros::Buffer tfBuffer;
 };
 
 #endif // SLAM_H_

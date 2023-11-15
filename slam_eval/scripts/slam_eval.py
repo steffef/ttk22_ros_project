@@ -10,16 +10,28 @@ gt_pose = np.empty((0, 7), float)
 gt_np_pose = np.empty((0, 7), float) # For storing the most recent ground truth pose
 
 def slam_pose_callback(msg):
+    """
+    Stores the most recent slam pose and ground truth in a global variable
+    to be plotted
+    """
     global slam_pose, gt_pose
     np_pose = np.array([[msg.position.x, msg.position.y, msg.position.z, msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w]])
     slam_pose = np.append(slam_pose, np_pose, axis=0)
     gt_pose = np.append(gt_pose, gt_np_pose, axis=0)
 
 def gt_pose_callback(msg):
+    """
+    Stores the most recent ground truth pose in a global variable, not to
+    be plotted
+    """
     global gt_np_pose
     gt_np_pose = np.array([[msg.position.x, msg.position.y, msg.position.z, msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w]])
 
 def plot_eval():
+    """
+    Plot the estimated pose and ground truth pose from the 
+    global variables slam_pose and gt_pose
+    """
     global slam_pose, gt_pose
     plt.ion()  
     fig1, ax1 = plt.subplots(3) 

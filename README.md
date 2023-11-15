@@ -9,12 +9,18 @@ cd <ros_ws>/src
 git clone git@github.com:steffef/ttk22_ros_project.git
 ```
 
-Then we need to clone necissary packages:
+Then we need to clone necessary packages:
 ```bash
 cd <ros_ws>
 wstool init
 wstool merge ./src/ttk22_ros_project/packages_ssh.rosinstall
 wstool update
+```
+
+Install dependencies for ros
+```bash
+sudo apt-get install python3-rosdep
+rosdep install --from-paths src --ignore-src -r -y
 ```
 
 Finally we compile the code and source the catkin ws setup:

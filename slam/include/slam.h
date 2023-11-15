@@ -23,19 +23,20 @@ public:
     SLAM();
 
     /**
-     * @brief 
+     * @brief runs icp and updates private variables in
+     * the SLAM class. This includes the pose
      * 
-     * @param pc 
+     * @param pc point cloud
      */
     void icp_alg(const pcl::PointCloud<pcl::PointXYZ>& pc);
     geometry_msgs::Pose get_pose_msg();
 
 private:
     /**
-     * @brief 
+     * @brief ISS keypoint detection
      * 
-     * @param pc 
-     * @param keypoints 
+     * @param pc point cloud 
+     * @param keypoints ret value after keypoint detection
      */
     void extract_keypoints(const pcl::PointCloud<pcl::PointXYZ>& pc,
                             pcl::PointCloud<pcl::PointXYZ>& keypoints);
@@ -50,6 +51,12 @@ class PcPcrocessor {
 public:
     PcPcrocessor();
 
+    /**
+     * @brief callback function for the point cloud subscriber. It
+     * also calls the slam algorithm and publishes the pose
+     * 
+     * @param ptCloud point cloud
+     */
     void callback(const sensor_msgs::PointCloud2ConstPtr& ptCloud);
 
 private:

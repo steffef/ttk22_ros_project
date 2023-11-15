@@ -44,6 +44,7 @@ void SLAM::icp_alg(const pcl::PointCloud<pcl::PointXYZ>& pc) {
             
             pose = init_pose; // Set initial pose
         } else {
+            // Propagate pose with transformation
             geometry_msgs::Pose transformed_pose;
             geometry_msgs::TransformStamped tf_transform_stamped;
             tf_transform_stamped.transform.rotation = tf2::toMsg(tf2::Quaternion(quat.x(), quat.y(), quat.z(), quat.w()));

@@ -1,15 +1,19 @@
 #include "slam.h"
 
 SLAM::SLAM() : icp() {
-    icp.setMaximumIterations(100);
+    icp.setMaxCorrespondenceDistance(1.0);
+    icp.setMaximumIterations(20);
     icp.setTransformationEpsilon(1e-9);
-    icp.setMaxCorrespondenceDistance(0.5);
     icp.setEuclideanFitnessEpsilon(1.0);
     icp.setRANSACOutlierRejectionThreshold(0.01);
 }
 
 void SLAM::icp_alg(const pcl::PointCloud<pcl::PointXYZ>& pc) {
-    if (prev_keypoints.empty()) {
+    if (pc.empty()) {
+        ROS_WARN("Point cloud is empty.");
+        return;
+    }
+    else if (prev_keypoints.empty()) {
         extract_keypoints(pc, prev_keypoints);
         //prev_keypoints = pc;
         return;
@@ -28,23 +32,26 @@ void SLAM::icp_alg(const pcl::PointCloud<pcl::PointXYZ>& pc) {
         transformationMatrix = icp.getFinalTransformation();
         Eigen::Quaternionf quat(transformationMatrix.block<3, 3>(0, 0));
 
-        tf::Transform tf_transform;
-        tf_transform.setRotation(tf::Quaternion(quat.x(), quat.y(), quat.z(), quat.w()));
-        tf_transform.setOrigin(tf::Vector3(transformationMatrix(0, 3),
-                                           transformationMatrix(1, 3),
-                                           transformationMatrix(2, 3)));
-
         // Check if pose orientation is valid
         if (pose.orientation.x == 0 && pose.orientation.y == 0 && pose.orientation.z == 0 &&
             pose.orientation.w == 0) {
 
-            // Set initial pose
-            tf::poseTFToMsg(tf_transform, pose);
+            geometry_msgs::Pose init_pose;
+            init_pose.orientation = tf2::toMsg(tf2::Quaternion(quat.x(), quat.y(), quat.z(), quat.w()));
+            init_pose.position.x = transformationMatrix(0, 3);
+            init_pose.position.y = transformationMatrix(1, 3);
+            init_pose.position.z = transformationMatrix(2, 3);
+            
+            pose = init_pose; // Set initial pose
         } else {
-            tf::Transform tf_pose;
-            tf::poseMsgToTF(pose, tf_pose);
-            tf_pose = tf_transform * tf_pose;
-            tf::poseTFToMsg(tf_pose, pose);
+            geometry_msgs::Pose transformed_pose;
+            geometry_msgs::TransformStamped tf_transform_stamped;
+            tf_transform_stamped.transform.rotation = tf2::toMsg(tf2::Quaternion(quat.x(), quat.y(), quat.z(), quat.w()));
+            tf_transform_stamped.transform.translation.x = transformationMatrix(0, 3);
+            tf_transform_stamped.transform.translation.y = transformationMatrix(1, 3);
+            tf_transform_stamped.transform.translation.z = transformationMatrix(2, 3);
+            tf2::doTransform(pose, transformed_pose, tf_transform_stamped);
+            pose = transformed_pose; // Update pose with new transformation
         }
 
         prev_keypoints = keypoints; // Update the previous point cloud
@@ -55,30 +62,26 @@ void SLAM::icp_alg(const pcl::PointCloud<pcl::PointXYZ>& pc) {
 
  void SLAM::extract_keypoints(const pcl::PointCloud<pcl::PointXYZ>& pc,
                                 pcl::PointCloud<pcl::PointXYZ>& keypoints) {
-    pcl::ISSKeypoint3D<pcl::PointXYZ, pcl::PointXYZ> iss_keypoint;
+    pcl::ISSKeypoint3D<pcl::PointXYZ, pcl::PointXYZ> iss_detector;
 
-    if(pc.empty()) {
-        ROS_WARN("Point cloud is empty.");
-        return;
-    }
-
-    double resolution = 0.05; // Treated as tuning parameter
+    double pc_resolution = 0.05; // Treated as tuning parameter
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
-    iss_keypoint.setSearchMethod(tree);
-    iss_keypoint.setSalientRadius(6 * resolution);
-    iss_keypoint.setNonMaxRadius(4 * resolution);
-    iss_keypoint.setThreshold21(0.975);
-    iss_keypoint.setThreshold32(0.975);
-    iss_keypoint.setMinNeighbors(5);
-    iss_keypoint.setInputCloud(pc.makeShared());
-    iss_keypoint.compute(keypoints);
+    iss_detector.setSearchMethod(tree);
+    iss_detector.setSalientRadius(6 * pc_resolution);
+    iss_detector.setNonMaxRadius(4 * pc_resolution);
+    iss_detector.setThreshold21(0.975);
+    iss_detector.setThreshold32(0.975);
+    iss_detector.setMinNeighbors(5);
+    iss_detector.setNumberOfThreads(4);
+    iss_detector.setInputCloud(pc.makeShared());
+    iss_detector.compute(keypoints);
 }
 
 geometry_msgs::Pose SLAM::get_pose_msg() {
     return pose;
 }
 
-PcPcrocessor::PcPcrocessor() : nh(), pose_pub(nh.advertise<geometry_msgs::Pose>("slam_pose_topic", 1)) {
+PcPcrocessor::PcPcrocessor() : nh(), pose_pub(nh.advertise<geometry_msgs::Pose>("slam_pose", 1)) {
 }
 
 void PcPcrocessor::callback(const sensor_msgs::PointCloud2ConstPtr& ptCloud) {
@@ -102,5 +105,10 @@ void PcPcrocessor::callback(const sensor_msgs::PointCloud2ConstPtr& ptCloud) {
     slam.icp_alg(cloud);
     geometry_msgs::Pose slam_pose = slam.get_pose_msg();
 
-    pose_pub.publish(slam_pose);
+    // Make sure to only publish valid poses
+    if (slam_pose.orientation.x == 0 && slam_pose.orientation.y == 0 && slam_pose.orientation.z == 0 &&
+        slam_pose.orientation.w == 0) {} // Do nothing
+    else{
+        pose_pub.publish(slam_pose);
+    }
 }
